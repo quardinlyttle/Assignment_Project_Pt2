@@ -21,7 +21,7 @@ process_queue readyQ;
 process_queue DeviceQ;
 process_queue completedQ;
 process *cpu[NUMofCores];
-process *sortingQ[MAX_PROCESSES];
+process *sortingQ[MAX_PROCESSES+1];
 process processes[MAX_PROCESSES+1];   
 
 int numberOfProcesses;  
@@ -175,6 +175,15 @@ void updateReadyQ(void){
     }
 }
 
+int isCPUrunning(void){
+
+    for(int i=0;i<NUMofCores;i++){
+        if(cpu[i]!=NULL){
+            return 1;
+        }
+    }
+    return 0;
+}
 
 int main(int argc, char* argv[])
 {
@@ -222,7 +231,7 @@ int main(int argc, char* argv[])
        printf("nextProcess: %d, numberOfProcesses: %d, readyQ.front: %p, readyQ.size: %d, DeviceQ.front: %p DeviceQ.size: %d, completedQ.size %d\n",
        nextProcess, numberOfProcesses, (void *)readyQ.front, readyQ.size, (void *)DeviceQ.front, DeviceQ.size, completedQ.size);
 
-       if( nextProcess >= numberOfProcesses && readyQ.size ==0 && DeviceQ.size==0){
+       if( nextProcess >= numberOfProcesses && readyQ.size ==0 && DeviceQ.size==0 && isCPUrunning()){
             printf("entered if\n");
             systemrunning=false;
             break;
@@ -240,13 +249,12 @@ int main(int argc, char* argv[])
     for (int i=0; i<numberOfProcesses; i++){
         totalWaitTime += processes[i].waitingTime;
         totalTurnAroundTime += (processes[i].endTime-processes[i].arrivalTime);
-        if(processes[i].endTime==simulationtime){
-            lastpid=processes[i].pid;
-        }
+        
     }
     double avgWait = totalWaitTime/ (double) numberOfProcesses;
     double avgTurnAround = totalTurnAroundTime/ (double) numberOfProcesses;
-    double avgCPU=  (cpuActiveTime/simulationtime) *100.00;
+    double avgCPU=  100.00*(cpuActiveTime/(double) simulationtime);
+    lastpid=completedQ.back->data->pid;
     printf("This is your cpuActiveTime %d\n",cpuActiveTime);
 
 
