@@ -63,8 +63,10 @@ void cpuOperation(void){
         if(cpu[i]==NULL){
             if(readyQ.front != NULL){
                 cpu[i]=readyQ.front->data;
+                printf("about to deque from readyq of size %d\n",readyQ.size);
+                //sleep(2);
                 dequeueProcess(&readyQ);
-                if(cpu[i]->startTime == 0 && cpu[i]->bursts[0].step==0 ){
+                if(cpu[i]->startTime < cpu[i]->arrivalTime ){
                     cpu[i]->startTime=simulationtime;
                     cpu[i]->waitingTime=cpu[i]->startTime-cpu[i]->arrivalTime;
                 }
@@ -82,12 +84,11 @@ void cpuOperation(void){
             if(cpu[i]->bursts[cpu[i]->currentBurst].step == cpu[i]->bursts[cpu[i]->currentBurst].length){
                 printf("burst completed on CPU %d for pid %d. Current burst: %d. Bursts left: %d.\n",i,cpu[i]->pid,cpu[i]->currentBurst, cpu[i]->numberOfBursts);
                 cpu[i]->quantumRemaining=0;
-                printf("WHERES MY IF");
                 if(cpu[i]->currentBurst < cpu[i]->numberOfBursts){
                     enqueueProcess(&DeviceQ,cpu[i]);
                     cpu[i]->currentBurst++;
                     cpu[i]=NULL;
-                    printf("Moved to DeviceQ from CPU %d",i);
+                    printf("Moved to DeviceQ from CPU %d\n",i);
                     continue;
                 }
                 else if(cpu[i]->currentBurst==cpu[i]->numberOfBursts){
@@ -127,7 +128,8 @@ void sorter(void){
 
     for(int i=0; i<sortingProcessNum;i++){
         enqueueProcess(&readyQ,sortingQ[i]);
-        printf("Process %d has been sorted and added to readyQ\n",sortingQ[i]->pid);
+        printf("Process %d has been sorted and added to readyQ.  Size is now %d\n",sortingQ[i]->pid,readyQ.size);
+        //sleep(2);
     }
     sortingProcessNum=0;
 }
@@ -142,6 +144,7 @@ void updateDeviceQ(void){
         p->bursts[p->currentBurst].step++;
         if(p->bursts[p->currentBurst].step== p->bursts[p->currentBurst].length){
             sortingQ[sortingProcessNum]=p;
+            sortingProcessNum++;
             p->currentBurst++;
             continue;
         }
@@ -190,8 +193,10 @@ int main(int argc, char* argv[])
     printf("Initialized Globals Succesfully\n");
 
 
+    /******SIMULATION START******/
     while(systemrunning){
         printf("in system time stamp:%d\n",simulationtime);
+        printf("Initial check for ready.size: %d\n",readyQ.size);
 
         /*check if there are processes arriving at this current time and add them. They have already been sorted by PID if the arrivalTime is the same*/
         while(processes[nextProcess].arrivalTime == simulationtime){
@@ -202,7 +207,7 @@ int main(int argc, char* argv[])
         }
 
         sorter();//add any waiting processes that needed to be sorted to the readyQ
-        cpuOperation();//Conduct the CPU Operations as necessary
+        cpuOperation();//Conduct the CPU Scheduler Operations as necessary
         updateDeviceQ();//Update the steps in device Q and move them to sorting if done.
         updateReadyQ();//Update waiting time for processes
 
