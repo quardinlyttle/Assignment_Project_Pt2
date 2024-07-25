@@ -334,3 +334,11 @@ int compareByArrivalandPID(const void *aa, const void *bb) {
     if ((a->arrivalTime == b->arrivalTime)&&(a->pid > b->pid)) return 1;    
     return 0;
 }
+
+int compareByPID(const void *aa, const void *bb) {
+    process *a = (process*) aa;
+    process *b = (process*) bb;
+    if (a->pid < b->pid) return -1;
+    if (a->pid > b->pid) return 1;    
+    return 0;
+}
