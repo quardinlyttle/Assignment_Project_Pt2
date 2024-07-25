@@ -325,10 +325,12 @@ int readProcess(process *dest) {
    That is, process a is less than process b iff:
         a arrives before b, OR
         they arrive at the same time and pid(a) < pid(b). */
-int compareByArrival(const void *aa, const void *bb) {
+int compareByArrivalandPID(const void *aa, const void *bb) {
     process *a = (process*) aa;
     process *b = (process*) bb;
     if (a->arrivalTime < b->arrivalTime) return -1;
     if (a->arrivalTime > b->arrivalTime) return 1;
+    if ((a->arrivalTime == b->arrivalTime)&&(a->pid < b->pid)) return -1;
+    if ((a->arrivalTime == b->arrivalTime)&&(a->pid > b->pid)) return 1;    
     return 0;
 }
