@@ -81,7 +81,7 @@ void cpuOperation(void){
             cpu[i]->bursts[cpu[i]->currentBurst].step++;
 
             /*When the current burst is finished, move to IO if more bursts, end if not*/
-            if(cpu[i]->bursts[cpu[i]->currentBurst].step == cpu[i]->bursts[cpu[i]->currentBurst].length){
+            if(cpu[i]->bursts[cpu[i]->currentBurst].step >= cpu[i]->bursts[cpu[i]->currentBurst].length){
                 printf("burst completed on CPU %d for pid %d. Current burst: %d. Bursts left: %d.\n",i,cpu[i]->pid,cpu[i]->currentBurst, cpu[i]->numberOfBursts);
                 cpu[i]->quantumRemaining=0;
                 if(cpu[i]->currentBurst < cpu[i]->numberOfBursts){
@@ -91,10 +91,12 @@ void cpuOperation(void){
                     printf("Moved to DeviceQ from CPU %d\n",i);
                     continue;
                 }
-                else if(cpu[i]->currentBurst==cpu[i]->numberOfBursts){
+                else if(cpu[i]->currentBurst>=cpu[i]->numberOfBursts){
                     cpu[i]->endTime=simulationtime;
                     enqueueProcess(&completedQ,cpu[i]);
                     cpu[i]=NULL;
+                    //                     printf("WHERE IS MY ISSUE!\n");
+                    // exit(1);
                     continue;
                     }                
             }
@@ -142,10 +144,15 @@ void updateDeviceQ(void){
         process *p=DeviceQ.front->data;
         dequeueProcess(&DeviceQ);
         p->bursts[p->currentBurst].step++;
-        if(p->bursts[p->currentBurst].step== p->bursts[p->currentBurst].length){
+        printf("we are step %d of %d for pid %d\n",p->bursts[p->currentBurst].step,p->bursts[p->currentBurst].length,p->pid);
+        //sleep(.5);
+        if(p->bursts[p->currentBurst].step >= p->bursts[p->currentBurst].length){
             sortingQ[sortingProcessNum]=p;
             sortingProcessNum++;
+            printf("This is the new number of processes to sort:%d\n",sortingProcessNum);
             p->currentBurst++;
+            printf("The next CPU burst for process %d is %d\n",p->pid,p->currentBurst);
+            //sleep(2);
             continue;
         }
         else{
