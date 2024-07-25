@@ -93,5 +93,6 @@ int readInt(char **);
 int readBracedInt(char **);
 int empty(char *);
 int readProcess(process *);
-int compareByArrival(const void *, const void *);
+int compareByArrivalandPID(const void *, const void *);
+int compareByPID(const void *, const void *);
 
