@@ -58,18 +58,36 @@ void initializeGlobals(void){
     simulationtime=0;
     nextProcess=0;
     numContextSwitch=0;
-    sortingProcessNum=0;
+    sortingProcessNum0=0;
+    sortingProcessNum1=0;
+    sortingProcessNum2=0;
 
     systemrunning=true;
 }
 
+void movetoCompleted(int i){
+    if(cpu[i]->currentBurst>cpu[i]->numberOfBursts){
+    cpu[i]->endTime=simulationtime;
+    enqueueProcess(&completedQ,cpu[i]);
+    cpu[i]=NULL;
+    printf("greater than!");
+    } 
+    if(cpu[i]->currentBurst==cpu[i]->numberOfBursts){
+    cpu[i]->endTime=simulationtime;
+    enqueueProcess(&completedQ,cpu[i]);
+    cpu[i]=NULL;
+    printf("equal to");
+    }     
+    
+
+}
 /*CPU Scheduler.*/
 void cpuOperation(void){
 
     for(int i=0;i<NUMofCores;i++){
 
         /*if the CPU isn't busy, pull from the Queue1 then Queue2 if available*/
-        if(cpu[i]==NULL){.
+        if(cpu[i]==NULL){
 
             /*Lowest Level Queue*/
             if(Queue0.front != NULL){
@@ -121,6 +139,64 @@ void cpuOperation(void){
                 cpuActiveTime++;
                 cpu[i]->quantumRemaining--;
                 cpu[i]->bursts[cpu[i]->currentBurst].step++;
+                movetoCompleted(i);
+
+                /*When the current burst is finished, move to IO if more bursts, end if not*/
+                if(cpu[i]->bursts[cpu[i]->currentBurst].step >= cpu[i]->bursts[cpu[i]->currentBurst].length){
+                    printf("burst completed on CPU %d for pid %d. Current burst: %d. Bursts left: %d.\n",i,cpu[i]->pid,cpu[i]->currentBurst, cpu[i]->numberOfBursts);
+                    cpu[i]->quantumRemaining=0;
+                    if(cpu[i]->currentBurst < cpu[i]->numberOfBursts){
+                        enqueueProcess(&DeviceQ,cpu[i]);
+                        cpu[i]->currentBurst++;
+                        cpu[i]=NULL;
+                        printf("Moved to DeviceQ from CPU %d\n",i);
+                        continue;
+                    }
+                    else if(cpu[i]->currentBurst>=cpu[i]->numberOfBursts){
+                        cpu[i]->endTime=simulationtime;
+                        printf("cpu %d just completed process pid%d",i,cpu[i]->pid);
+                        sleep(3);
+                        enqueueProcess(&completedQ,cpu[i]);
+                        cpu[i]=NULL;
+                        //                     printf("WHERE IS MY ISSUE!\n");
+                        // exit(1);
+                        continue;
+                        }                
+                }
+                
+                /*perform context switch if quantum is up and process is not finished*/
+                if(cpu[i]->quantumRemaining==0){
+                    printf("Doing Context switch from Q0 to Q1 on CPU%d for process%d\n",i,cpu[i]->pid);
+                    sortingQ1[sortingProcessNum1]=cpu[i];
+                    sortingProcessNum1++;
+                    numContextSwitch++;
+                    cpu[i]=NULL;
+                    continue;
+                    }
+
+            }
+
+            /*Mid Level Queue operation*/
+            if(cpu[i]->currentQueue==1){
+                if(Queue0.front!=NULL){
+                    //Move process to the front of its original Queue
+                    printf("premption from Q1");
+                    numContextSwitch++;
+                    int size = Queue1.size;
+                    enqueueProcess(&Queue1,cpu[i]);
+                    for(int i=0;i<size;i++){
+                        process *p = Queue1.front->data;
+                        dequeueProcess(&Queue1);
+                        enqueueProcess(&Queue1,p);
+                    }
+                    cpu[i]=NULL;
+                    cpuOperation();
+                    continue;
+                }
+                cpuActiveTime++;
+                cpu[i]->quantumRemaining--;
+                cpu[i]->bursts[cpu[i]->currentBurst].step++;
+                movetoCompleted(i);
 
                 /*When the current burst is finished, move to IO if more bursts, end if not*/
                 if(cpu[i]->bursts[cpu[i]->currentBurst].step >= cpu[i]->bursts[cpu[i]->currentBurst].length){
@@ -140,23 +216,63 @@ void cpuOperation(void){
                         //                     printf("WHERE IS MY ISSUE!\n");
                         // exit(1);
                         continue;
-                        }                
+                        }  
+                                      
                 }
                 
                 /*perform context switch if quantum is up and process is not finished*/
                 if(cpu[i]->quantumRemaining==0){
-                    if(readyQ.front!=NULL){
-                        printf("Doing Context switch on CPU%d for process%d\n",i,cpu[i]->pid);
-                        sortingQ[sortingProcessNum]=cpu[i];
-                        sortingProcessNum++;
-                        numContextSwitch++;
-                        cpu[i]=NULL;
-                    }
-                    else if(readyQ.front==NULL){
-                        cpu[i]->quantumRemaining=quantumTime;
+                    printf("Doing Context switch from Q1 to Q2 on CPU%d for process%d\n",i,cpu[i]->pid);
+                    //sleep(2);
+                    sortingQ2[sortingProcessNum2]=cpu[i];
+                    sortingProcessNum2++;
+                    numContextSwitch++;
+                    cpu[i]=NULL;
+                    continue;
                     }
 
+            }
+            
+            /*High Level Queue operation*/
+            if(cpu[i]->currentQueue==2){
+                if(Queue0.front!=NULL || Queue1.front != NULL){
+                    //Move process to the front of its original Queue
+                    printf("premption from Q2");
+                    numContextSwitch++;
+                    int size = Queue2.size;
+                    enqueueProcess(&Queue2,cpu[i]);
+                    for(int i=0;i<size;i++){
+                        process *p = Queue2.front->data;
+                        dequeueProcess(&Queue2);
+                        enqueueProcess(&Queue2,p);
+                    }
+                    cpu[i]=NULL;
+                    cpuOperation();
+                    continue;
                 }
+                cpuActiveTime++;
+                cpu[i]->bursts[cpu[i]->currentBurst].step++;
+                movetoCompleted(i);
+
+                /*When the current burst is finished, move to IO if more bursts, end if not*/
+                if(cpu[i]->bursts[cpu[i]->currentBurst].step >= cpu[i]->bursts[cpu[i]->currentBurst].length){
+                    printf("burst completed on CPU %d for pid %d. Current burst: %d. Bursts left: %d.\n",i,cpu[i]->pid,cpu[i]->currentBurst, cpu[i]->numberOfBursts);
+                    cpu[i]->quantumRemaining=0;
+                    if(cpu[i]->currentBurst < cpu[i]->numberOfBursts){
+                        enqueueProcess(&DeviceQ,cpu[i]);
+                        cpu[i]->currentBurst++;
+                        cpu[i]=NULL;
+                        printf("Moved to DeviceQ from CPU %d\n",i);
+                        continue;
+                    }
+                    if(cpu[i]->currentBurst>=cpu[i]->numberOfBursts){
+                        cpu[i]->endTime=simulationtime;
+                        enqueueProcess(&completedQ,cpu[i]);
+                        cpu[i]=NULL;
+                        continue;
+                        }                
+                }
+
             }
 
         }
@@ -175,7 +291,8 @@ void sorter(void){
 
     for(int i=0; i<sortingProcessNum0;i++){
         enqueueProcess(&Queue0,sortingQ0[i]);
-        printf("Process %d has been sorted and added to readyQ.  Size is now %d\n",sortingQ0[i]->pid,Queue0.size);
+        sortingQ0[i]->currentQueue=0;
+        printf("Process %d has been sorted and added to Queue0.  Size is now %d\n",sortingQ0[i]->pid,Queue0.size);
         //sleep(2);
     }
     sortingProcessNum0=0;
@@ -188,7 +305,8 @@ void sorter(void){
 
     for(int i=0; i<sortingProcessNum1;i++){
         enqueueProcess(&Queue1,sortingQ1[i]);
-        printf("Process %d has been sorted and added to readyQ.  Size is now %d\n",sortingQ1[i]->pid,Queue1.size);
+        sortingQ1[i]->currentQueue=1;
+        printf("Process %d has been sorted and added to Queue1.  Size is now %d\n",sortingQ1[i]->pid,Queue1.size);
         //sleep(2);
     }
     sortingProcessNum1=0;
@@ -202,7 +320,8 @@ void sorter(void){
 
     for(int i=0; i<sortingProcessNum2;i++){
         enqueueProcess(&Queue2,sortingQ2[i]);
-        printf("Process %d has been sorted and added to readyQ.  Size is now %d\n",sortingQ2[i]->pid,Queue2.size);
+        sortingQ2[i]->currentQueue=2;
+        printf("Process %d has been sorted and added to Queue2.  Size is now %d\n",sortingQ2[i]->pid,Queue2.size);
         //sleep(2);
     }
     sortingProcessNum2=0;
@@ -224,7 +343,7 @@ void updateDeviceQ(void){
             printf("This is the new number of processes to sort for Q0:%d\n",sortingProcessNum0);
             p->currentBurst++;
             printf("The next CPU burst for process %d is %d\n",p->pid,p->currentBurst);
-            //sleep(2);
+            //sleep(2); 
             continue;
         }
         else{
@@ -236,7 +355,7 @@ void updateDeviceQ(void){
 
 void updateQ0(void){
     int size = Queue0.size;
-    printf("Updating readyQ of size %d\n",size);
+    printf("Updating Queue0 of size %d\n",size);
     for(int i=0;i<size;i++){
     process *p=Queue0.front->data;
     dequeueProcess(&Queue0);
@@ -249,7 +368,7 @@ void updateQ0(void){
 
 void updateQ1(void){
     int size = Queue1.size;
-    printf("Updating readyQ of size %d\n",size);
+    printf("Updating Queue1 of size %d\n",size);
     for(int i=0;i<size;i++){
     process *p=Queue1.front->data;
     dequeueProcess(&Queue1);
@@ -262,7 +381,7 @@ void updateQ1(void){
 
 void updateQ2(void){
     int size = Queue2.size;
-    printf("Updating readyQ of size %d\n",size);
+    printf("Updating Queue2 of size %d\n",size);
     for(int i=0;i<size;i++){
     process *p=Queue2.front->data;
     dequeueProcess(&Queue2);
@@ -286,7 +405,7 @@ int isCPUrunning(void){
 int main(int argc, char* argv[])
 {
     /*Check if the correct time quantum arguments are passed through*/
-    if(argc <= 1 || argc > 2){
+    if(argc != 3){
         error_bad_quantum();
     }
 
@@ -311,17 +430,19 @@ int main(int argc, char* argv[])
     /******SIMULATION START******/
     while(systemrunning){
         printf("in system time stamp:%d\n",simulationtime);
-        printf("Initial check for ready.size: %d\n",readyQ.size);
+        printf("Initial check for Queue0.size: %d\n",Queue0.size);
+        printf("Initial check for Queue1.size: %d\n",Queue1.size);
+        printf("Initial check for Queue2.size: %d\n",Queue2.size);
 
         /*check if there are processes arriving at this current time and add them. They have already been sorted by PID if the arrivalTime is the same*/
         while(processes[nextProcess].arrivalTime == simulationtime){
-            enqueueProcess(&readyQ,&processes[nextProcess]);  
+            enqueueProcess(&Queue0,&processes[nextProcess]);  
             nextProcess++;  
-            printf("process added to readyQ from arrivals and is now size %d\n",readyQ.size); 
+            printf("process added to Queue0 from arrivals and is now size %d\n",Queue0.size); 
                 printf("next arrival at%d\n",processes[nextProcess].arrivalTime);     
         }
 
-        sorter();//add any waiting processes that needed to be sorted to the readyQ
+        sorter();//add any waiting processes that needed to be sorted to the multi-queues
         cpuOperation();//Conduct the CPU Scheduler Operations as necessary
         updateDeviceQ();//Update the steps in device Q and move them to sorting if done.
         //Update waiting time for processes
@@ -330,10 +451,10 @@ int main(int argc, char* argv[])
         updateQ2();
 
 
-       printf("nextProcess: %d, numberOfProcesses: %d, readyQ.front: %p, readyQ.size: %d, DeviceQ.front: %p DeviceQ.size: %d, completedQ.size %d\n",
-       nextProcess, numberOfProcesses, (void *)readyQ.front, readyQ.size, (void *)DeviceQ.front, DeviceQ.size, completedQ.size);
+       printf("nextProcess: %d, numberOfProcesses: %d, Queue0.front: %p, Queue0.size: %d, Queue1.front: %p, Queue1.size: %d,Queue2.front: %p, Queue2.size: %d\n DeviceQ.front: %p DeviceQ.size: %d, completedQ.size %d\n",
+       nextProcess, numberOfProcesses, (void *)Queue0.front, Queue0.size, (void *)Queue1.front, Queue1.size, (void *)Queue2.front, Queue2.size,  (void *)DeviceQ.front, DeviceQ.size, completedQ.size);
 
-       if( nextProcess >= numberOfProcesses && readyQ.size ==0 && DeviceQ.size==0 && isCPUrunning()){
+       if( nextProcess >= numberOfProcesses && Queue0.size ==0 && Queue1.size ==0 && Queue2.size ==0 && DeviceQ.size==0 && isCPUrunning()){
             printf("entered if\n");
             systemrunning=false;
             break;
@@ -356,7 +477,10 @@ int main(int argc, char* argv[])
     double avgWait = totalWaitTime/ (double) numberOfProcesses;
     double avgTurnAround = totalTurnAroundTime/ (double) numberOfProcesses;
     double avgCPU=  100.00*(cpuActiveTime/(double) simulationtime);
-    lastpid=completedQ.back->data->pid;
+    if(completedQ.size>0){
+        lastpid=completedQ.back->data->pid;
+    }
+
     printf("This is your cpuActiveTime %d\n",cpuActiveTime);
 
 
